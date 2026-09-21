@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStorage, saveStorage } from '@/lib/storage';
+import { getStorageAsync, saveStorageAsync } from '@/lib/storage';
 import { testMetaConnection } from '@/lib/metaApi';
 
 export async function POST(request) {
@@ -7,7 +7,7 @@ export async function POST(request) {
     const body = await request.json();
     const { pageId, pageAccessToken, igAccountId, igUsername, isDemoMode } = body;
 
-    const storage = getStorage();
+    const storage = await getStorageAsync();
 
     if (isDemoMode) {
       storage.settings.meta = {
@@ -21,7 +21,7 @@ export async function POST(request) {
         connectedAt: new Date().toISOString(),
         pagePicture: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80',
       };
-      saveStorage(storage);
+      await saveStorageAsync(storage);
       return NextResponse.json({ success: true, meta: storage.settings.meta, message: 'تم تفعيل الوضع التجريبي بنجاح' });
     }
 
@@ -35,14 +35,14 @@ export async function POST(request) {
       pageId: testRes.pageId,
       pageName: testRes.pageName,
       pageAccessToken,
-      igAccountId: testRes.instagram?.id || igAccountId || '',
-      igUsername: testRes.instagram?.username || igUsername || '',
+      igAccountId: testRes.instagram?.id || igAccountId || process.env.META_IG_ACCOUNT_ID || '',
+      igUsername: testRes.instagram?.username || igUsername || 'souq_eleshtraqat',
       isConnected: true,
       connectedAt: new Date().toISOString(),
       pagePicture: testRes.pagePicture || '',
     };
 
-    saveStorage(storage);
+    await saveStorageAsync(storage);
     return NextResponse.json({
       success: true,
       meta: storage.settings.meta,

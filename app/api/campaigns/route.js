@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getStorage, saveStorage } from '@/lib/storage';
+import { getStorageAsync, saveStorageAsync } from '@/lib/storage';
 
 export async function GET() {
   try {
-    const storage = getStorage();
+    const storage = await getStorageAsync();
     return NextResponse.json({ success: true, campaigns: storage.campaigns });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -19,7 +19,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'اسم الحملة مطلوب' }, { status: 400 });
     }
 
-    const storage = getStorage();
+    const storage = await getStorageAsync();
     const newCamp = {
       id: `camp_${Date.now()}`,
       name: name.trim(),
@@ -32,7 +32,7 @@ export async function POST(request) {
     };
 
     storage.campaigns.push(newCamp);
-    saveStorage(storage);
+    await saveStorageAsync(storage);
 
     return NextResponse.json({ success: true, campaign: newCamp });
   } catch (err) {

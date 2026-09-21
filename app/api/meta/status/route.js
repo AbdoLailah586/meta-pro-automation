@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getStorage, saveStorage } from '@/lib/storage';
+import { getStorageAsync, saveStorageAsync } from '@/lib/storage';
 
 export async function GET() {
   try {
-    const storage = getStorage();
+    const storage = await getStorageAsync();
     const meta = storage.settings.meta;
 
     // Auto-sync fresh Page Name & Picture from Meta if connected
@@ -24,13 +24,17 @@ export async function GET() {
             hasChanges = true;
           }
           if (liveData.instagram_business_account) {
+            if (liveData.instagram_business_account.id && liveData.instagram_business_account.id !== meta.igAccountId) {
+              meta.igAccountId = liveData.instagram_business_account.id;
+              hasChanges = true;
+            }
             if (liveData.instagram_business_account.username && liveData.instagram_business_account.username !== meta.igUsername) {
               meta.igUsername = liveData.instagram_business_account.username;
               hasChanges = true;
             }
           }
           if (hasChanges) {
-            saveStorage(storage);
+            await saveStorageAsync(storage);
           }
         }
       } catch (syncErr) {
@@ -45,7 +49,7 @@ export async function GET() {
         pageName: meta.pageName,
         igAccountId: meta.igAccountId,
         igUsername: meta.igUsername,
-        isConnected: meta.isConnected,
+        isConnected: Boolean(meta.pageAccessToken && meta.pageId),
         connectedAt: meta.connectedAt,
         pagePicture: meta.pagePicture,
         hasToken: Boolean(meta.pageAccessToken && meta.pageAccessToken.length > 5),

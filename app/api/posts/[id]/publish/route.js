@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getStorage, saveStorage } from '@/lib/storage';
+import { getStorageAsync, saveStorageAsync } from '@/lib/storage';
 import { publishToFacebook, publishToInstagram } from '@/lib/metaApi';
 import { publishToWhatsApp } from '@/lib/whatsappBridge';
 
 export async function POST(request, { params }) {
   try {
     const { id } = params;
-    const storage = getStorage();
+    const storage = await getStorageAsync();
     const post = storage.posts.find((p) => p.id === id);
 
     if (!post) {
@@ -77,7 +77,7 @@ export async function POST(request, { params }) {
     post.metrics.reach = post.metrics.reach || Math.floor(Math.random() * 600) + 150;
     post.metrics.likes = post.metrics.likes || Math.floor(Math.random() * 50) + 12;
 
-    saveStorage(storage);
+    await saveStorageAsync(storage);
     return NextResponse.json({ success: true, post, warning: publishErrors.length > 0 ? publishErrors.join(' | ') : null });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

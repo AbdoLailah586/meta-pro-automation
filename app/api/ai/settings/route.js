@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getStorage, saveStorage } from '@/lib/storage';
+import { getStorageAsync, saveStorageAsync } from '@/lib/storage';
 import { FREE_AI_MODELS } from '@/lib/aiService';
 
 export async function GET() {
   try {
-    const storage = getStorage();
+    const storage = await getStorageAsync();
     const ai = storage.settings.ai;
     return NextResponse.json({
       success: true,
@@ -26,7 +26,7 @@ export async function POST(request) {
     const body = await request.json();
     const { openRouterApiKey, preferredModel, defaultTone, defaultLanguage } = body;
 
-    const storage = getStorage();
+    const storage = await getStorageAsync();
 
     if (openRouterApiKey !== undefined) {
       storage.settings.ai.openRouterApiKey = openRouterApiKey.trim();
@@ -41,7 +41,7 @@ export async function POST(request) {
       storage.settings.ai.defaultLanguage = defaultLanguage;
     }
 
-    saveStorage(storage);
+    await saveStorageAsync(storage);
 
     return NextResponse.json({
       success: true,

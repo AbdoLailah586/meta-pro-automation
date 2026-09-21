@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getStorage, saveStorage } from '@/lib/storage';
+import { getStorageAsync, saveStorageAsync } from '@/lib/storage';
 import { publishToFacebook, publishToInstagram } from '@/lib/metaApi';
 import { publishToWhatsApp } from '@/lib/whatsappBridge';
 
 export async function GET(request) {
   try {
-    const storage = getStorage();
+    const storage = await getStorageAsync();
     const { searchParams } = new URL(request.url);
     const platform = searchParams.get('platform');
     const status = searchParams.get('status');
@@ -41,7 +41,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'محتوى المنشور مطلوب' }, { status: 400 });
     }
 
-    const storage = getStorage();
+    const storage = await getStorageAsync();
     const metaSettings = storage.settings.meta;
 
     const newPost = {
@@ -126,7 +126,7 @@ export async function POST(request) {
     }
 
     storage.posts.unshift(newPost);
-    saveStorage(storage);
+    await saveStorageAsync(storage);
 
     return NextResponse.json({ success: true, post: newPost });
   } catch (err) {
