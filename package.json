@@ -1,0 +1,19 @@
+{
+  "name": "meta-pro-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Meta Pro Marketing Suite — AI-powered Facebook & Instagram Automation Platform",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "lucide-react": "^0.475.0",
+    "next": "^14.2.24",
+    "pg": "^8.23.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
