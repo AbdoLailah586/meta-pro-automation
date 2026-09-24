@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   PenSquare,
@@ -33,7 +33,15 @@ import {
   Facebook,
   Instagram,
   MessageSquare,
+  Search,
+  Video,
+  Rocket,
+  Flame,
+  Upload,
 } from 'lucide-react';
+import CompetitorSpyRadar from './components/CompetitorSpyRadar';
+import ViralReelsStudio from './components/ViralReelsStudio';
+import GrowthHub from './components/GrowthHub';
 
 export default function MetaProDashboard() {
   // Navigation State
@@ -104,6 +112,45 @@ export default function MetaProDashboard() {
     mediaUrl: '',
   });
   const [isUpdatingPost, setIsUpdatingPost] = useState(false);
+
+  // Image Upload State
+  const fileInputRef = useRef(null);
+  const editFileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = async (e, isEdit = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (isEdit) {
+          setEditForm((prev) => ({ ...prev, mediaUrl: data.url }));
+        } else {
+          setComposer((prev) => ({ ...prev, mediaUrl: data.url }));
+        }
+        showToast('تم رفع الصورة من جهازك بنجاح!');
+      } else {
+        showToast(data.error || 'فشل رفع الصورة', 'error');
+      }
+    } catch (err) {
+      showToast('خطأ أثناء رفع الصورة', 'error');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  };
 
   // Toast notification
   const [toast, setToast] = useState(null);
@@ -520,6 +567,39 @@ export default function MetaProDashboard() {
 
             <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '12px 0' }} />
 
+            <div style={{ padding: '0 8px', marginBottom: '4px', fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
+              أدوات النمو والانتشار المجاني
+            </div>
+
+            <button
+              onClick={() => setActiveTab('competitors')}
+              className={`nav-item ${activeTab === 'competitors' ? 'active' : ''}`}
+              style={{ width: '100%', border: 'none', textAlign: 'right' }}
+            >
+              <Search size={18} color="#38BDF8" />
+              <span>رادار تجسس المنافسين</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('viral-reels')}
+              className={`nav-item ${activeTab === 'viral-reels' ? 'active' : ''}`}
+              style={{ width: '100%', border: 'none', textAlign: 'right' }}
+            >
+              <Video size={18} color="#EC4899" />
+              <span>استوديو الريلز الفيروسي</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('growth-hub')}
+              className={`nav-item ${activeTab === 'growth-hub' ? 'active' : ''}`}
+              style={{ width: '100%', border: 'none', textAlign: 'right' }}
+            >
+              <Rocket size={18} color="#10B981" />
+              <span>مركز الانتشار المجاني</span>
+            </button>
+
+            <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '12px 0' }} />
+
             <button
               onClick={() => setActiveTab('meta-connect')}
               className={`nav-item ${activeTab === 'meta-connect' ? 'active' : ''}`}
@@ -566,6 +646,9 @@ export default function MetaProDashboard() {
               {activeTab === 'calendar' && 'تقويم وجدولة المنشورات'}
               {activeTab === 'campaigns' && 'إدارة وتتبع الحملات التسويقية'}
               {activeTab === 'analytics' && 'تقارير الوصول والتفاعل'}
+              {activeTab === 'competitors' && '🕵️‍♂️ رادار تجسس واستخبارات إعلانات المنافسين (Ad Library)'}
+              {activeTab === 'viral-reels' && '🎬 استوديو الريلز الفيروسي بالذكاء الاصطناعي (ShortGPT Engine)'}
+              {activeTab === 'growth-hub' && '🚀 مركز الانتشار المجاني وعروض الواتساب وجروبات فيسبوك'}
               {activeTab === 'meta-connect' && 'ربط حسابات فيسبوك وإنستغرام (Meta Graph)'}
               {activeTab === 'ai-settings' && 'إعدادات نماذج الذكاء الاصطناعي (OpenRouter)'}
             </h1>
@@ -965,20 +1048,63 @@ export default function MetaProDashboard() {
                 />
               </div>
 
-              {/* Image URL / Attachment */}
+              {/* Image Upload & Attachment */}
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
-                  رابط صورة المنشور (مطلوب لإنستغرام):
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="https://example.com/image.jpg"
-                    value={composer.mediaUrl}
-                    onChange={(e) => setComposer({ ...composer, mediaUrl: e.target.value })}
-                  />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    صورة المنشور (مطلوبة لإنستغرام):
+                  </label>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    يمكنك رفع صورة من جهازك مباشرة أو إدخال رابط
+                  </span>
+                </div>
+
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleFileUpload(e, false)}
+                />
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px' }}>
                   <button
+                    type="button"
+                    disabled={isUploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn btn-primary"
+                    style={{
+                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 18px',
+                      fontSize: '0.86rem',
+                    }}
+                  >
+                    <Upload size={16} />
+                    <span>{isUploading ? 'جاري رفع الملف...' : '📁 رفع صورة من جهازك'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAiImageModal(true);
+                      if (!aiImagePrompt && composer.content) {
+                        setAiImagePrompt(composer.content.slice(0, 100));
+                      }
+                    }}
+                    className="btn btn-ai btn-sm"
+                    title="توليد صورة إعلانية بالذكاء الاصطناعي مجاناً"
+                  >
+                    <Sparkles size={16} />
+                    <span>توليد صورة بالـ AI</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       const samples = [
                         'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80',
@@ -994,21 +1120,58 @@ export default function MetaProDashboard() {
                     <ImageIcon size={16} />
                     <span>صورة تجريبية</span>
                   </button>
-
-                  <button
-                    onClick={() => {
-                      setShowAiImageModal(true);
-                      if (!aiImagePrompt && composer.content) {
-                        setAiImagePrompt(composer.content.slice(0, 100));
-                      }
-                    }}
-                    className="btn btn-ai btn-sm"
-                    title="توليد صورة إعلانية بالذكاء الاصطناعي مجاناً"
-                  >
-                    <Sparkles size={16} />
-                    <span>توليد صورة بالـ AI</span>
-                  </button>
                 </div>
+
+                {/* Input field for direct URL if needed */}
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="أو ضع رابط صورة مباشر: https://... أو /gemini_pro.png"
+                  value={composer.mediaUrl}
+                  onChange={(e) => setComposer({ ...composer, mediaUrl: e.target.value })}
+                />
+
+                {/* Preview Thumbnail */}
+                {composer.mediaUrl && (
+                  <div
+                    style={{
+                      marginTop: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <img
+                        src={composer.mediaUrl}
+                        alt="Preview"
+                        style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#10B981' }}>
+                          ✓ الصورة جاهزة للإرفاق
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', maxWidth: '380px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {composer.mediaUrl}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setComposer({ ...composer, mediaUrl: '' })}
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: '0.75rem', color: 'var(--color-danger)' }}
+                    >
+                      إزالة الصورة ✕
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Campaign Assignment & Scheduling */}
@@ -1818,6 +1981,64 @@ export default function MetaProDashboard() {
               <span>حفظ الإعدادات</span>
             </button>
           </div>
+        )}
+
+        {/* ================= TAB: COMPETITORS SPY RADAR ================= */}
+        {activeTab === 'competitors' && (
+          <CompetitorSpyRadar
+            showToast={showToast}
+            onRecreateAd={(ad) => {
+              const recreatedDraft = `🔥 عرض استثنائي مستوحى من أقوى الحملات:\n\n${ad.link_text}\n\n${ad.body}\n\n📲 اطلب الآن عبر الواتساب: 01554826209\n🌐 المتجر: https://souq-al-ishtirakat-xi.vercel.app/`;
+              setComposer({
+                ...composer,
+                content: recreatedDraft,
+                mediaUrl: ad.creative_image || '/gemini_pro.png',
+                platforms: ['facebook', 'instagram', 'whatsapp'],
+              });
+              setActiveTab('composer');
+              setShowAiModal(true);
+              setAiTopic(`إعادة صياغة إعلان لخدمتنا سوق الاشتراكات:\nالعنوان: ${ad.link_text}\nالنص:\n${ad.body}`);
+              showToast('تم نقل إعلان المنافس للمحرر ومساعد الذكاء الاصطناعي لإعادة صياغته!');
+            }}
+          />
+        )}
+
+        {/* ================= TAB: VIRAL REELS STUDIO ================= */}
+        {activeTab === 'viral-reels' && (
+          <ViralReelsStudio
+            showToast={showToast}
+            onSendToComposer={(reel) => {
+              const text = `🎬 [ريلز فيروسي]: ${reel.title}\n\n🔥 الـ Hook (أول 3 ثواني):\n"${reel.hook}"\n\n📌 المشكلة والحل:\n${reel.problem}\n${reel.solution}\n\n🗣️ السكريبت الصوتي للتعليق (Voiceover):\n"${reel.fullVoiceover}"\n\n📲 للطلب والتسليم الفوري:\nواتساب: 01554826209\nرابط المتجر: https://souq-al-ishtirakat-xi.vercel.app/\n\n${reel.hashtags}`;
+              setComposer({
+                ...composer,
+                content: text,
+                mediaUrl: '/gemini_pro.png',
+                platforms: ['facebook', 'instagram', 'whatsapp'],
+              });
+              setActiveTab('composer');
+              showToast('تم إرسال سكريبت الريلز إلى استوديو النشر بنجاح!');
+            }}
+          />
+        )}
+
+        {/* ================= TAB: ORGANIC GROWTH HUB ================= */}
+        {activeTab === 'growth-hub' && (
+          <GrowthHub
+            showToast={showToast}
+            onSendToComposer={(content, mediaUrl) => {
+              setComposer({
+                ...composer,
+                content,
+                mediaUrl: mediaUrl || '/gemini_pro.png',
+                platforms: ['facebook', 'instagram', 'whatsapp'],
+              });
+              setActiveTab('composer');
+              showToast('تم نقل المحتوى إلى استوديو النشر!');
+            }}
+            onPublishLiveNow={async () => {
+              await handlePublishNow('post_gemini_pro_18m_launch');
+            }}
+          />
         )}
       </main>
 
