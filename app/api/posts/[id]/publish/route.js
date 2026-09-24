@@ -74,8 +74,13 @@ export async function POST(request, { params }) {
     }
 
     post.publishedAt = new Date().toISOString();
-    post.metrics.reach = post.metrics.reach || Math.floor(Math.random() * 600) + 150;
-    post.metrics.likes = post.metrics.likes || Math.floor(Math.random() * 50) + 12;
+    post.metrics = post.metrics || {
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      reach: 0,
+      lastSyncedAt: new Date().toISOString(),
+    };
 
     await saveStorageAsync(storage);
     return NextResponse.json({ success: true, post, warning: publishErrors.length > 0 ? publishErrors.join(' | ') : null });

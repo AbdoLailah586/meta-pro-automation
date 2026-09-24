@@ -59,8 +59,13 @@ async function handleCron() {
 
         post.status = 'published';
         post.publishedAt = new Date().toISOString();
-        post.metrics.reach = post.metrics.reach || Math.floor(Math.random() * 500) + 120;
-        post.metrics.likes = post.metrics.likes || Math.floor(Math.random() * 40) + 10;
+        post.metrics = post.metrics || {
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          reach: 0,
+          lastSyncedAt: new Date().toISOString(),
+        };
         results.push({ id: post.id, status: 'published' });
       } catch (pubErr) {
         post.status = 'failed';

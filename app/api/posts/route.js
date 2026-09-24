@@ -121,8 +121,13 @@ export async function POST(request) {
       }
 
       newPost.publishedAt = new Date().toISOString();
-      newPost.metrics.reach = Math.floor(Math.random() * 500) + 120;
-      newPost.metrics.likes = Math.floor(Math.random() * 45) + 10;
+      newPost.metrics = {
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        reach: 0,
+        lastSyncedAt: new Date().toISOString(),
+      };
     }
 
     storage.posts.unshift(newPost);

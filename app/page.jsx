@@ -112,6 +112,7 @@ export default function MetaProDashboard() {
     mediaUrl: '',
   });
   const [isUpdatingPost, setIsUpdatingPost] = useState(false);
+  const [isSyncingMetrics, setIsSyncingMetrics] = useState(false);
 
   // Image Upload State
   const fileInputRef = useRef(null);
@@ -337,6 +338,39 @@ export default function MetaProDashboard() {
     const clean = editForm.content.replace(/https?:\/\/[^\s]+/gi, '🔗 (الرابط في البايو)');
     setEditForm((prev) => ({ ...prev, content: clean }));
     showToast('تم استبدال الروابط بـ "الرابط في البايو 🔗" لتجنب حظر إنستغرام!');
+  };
+
+  // Sync real-time metrics directly from Meta Graph API
+  const handleSyncPostMetrics = async (postId = null) => {
+    setIsSyncingMetrics(true);
+    try {
+      const res = await fetch('/api/posts/sync-metrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(
+          postId
+            ? 'تمت مزامنة الإحصائيات الحية للمنشور مباشرة من خوادم Meta!'
+            : `تمت مزامنة إحصائيات ${data.syncedCount} منشورات حقيقية من Meta!`
+        );
+        await fetchData();
+        if (postId && selectedPost && selectedPost.id === postId) {
+          const updated = data.posts?.find((p) => p.id === postId);
+          if (updated) {
+            setSelectedPost(updated);
+          }
+        }
+      } else {
+        showToast(data.error || 'فشلت المزامنة مع Meta', 'error');
+      }
+    } catch (err) {
+      showToast('حدث خطأ أثناء الاتصال بواجهة Meta Graph API', 'error');
+    } finally {
+      setIsSyncingMetrics(false);
+    }
   };
 
   // Handle AI Content Generation
@@ -708,6 +742,27 @@ export default function MetaProDashboard() {
               <MessageSquare size={16} />
               <span>WhatsApp Pro CRM</span>
             </div>
+
+            <button
+              onClick={() => handleSyncPostMetrics()}
+              disabled={isSyncingMetrics}
+              className="btn btn-secondary btn-sm"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '7px 16px',
+                borderRadius: 'var(--radius-full)',
+                fontSize: '0.82rem',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                color: '#10B981',
+                background: 'rgba(16, 185, 129, 0.08)',
+              }}
+              title="مزامنة الإحصائيات الحقيقية لجميع المنشورات مباشرة من خوادم Meta Graph API"
+            >
+              <RefreshCw size={14} className={isSyncingMetrics ? 'spin' : ''} />
+              <span>{isSyncingMetrics ? 'جاري المزامنة...' : '🔄 مزامنة إحصائيات Meta الحية'}</span>
+            </button>
           </div>
         </header>
 
@@ -2478,28 +2533,73 @@ export default function MetaProDashboard() {
               />
             </div>
 
-            {/* Media Image URL */}
+            {/* Media Image URL & Direct Upload */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '0.86rem', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '700' }}>
-                رابط صورة المنشور (Media Image URL):
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', fontWeight: '700' }}>
+                  صورة المنشور (Media Image):
+                </label>
+
+                {/* Hidden File Input for Edit Modal */}
+                <input
+                  type="file"
+                  ref={editFileInputRef}
+                  style={{ display: 'none' }}
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => handleFileUpload(e, true)}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => editFileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    fontSize: '0.78rem',
+                    color: '#10B981',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  <Upload size={14} />
+                  <span>{isUploading ? 'جاري الرفع...' : '📁 رفع صورة جديدة من جهازك'}</span>
+                </button>
+              </div>
+
               <input
                 type="text"
                 className="input"
-                placeholder="https://..."
+                placeholder="https://... أو /gemini_pro.png"
                 value={editForm.mediaUrl}
                 onChange={(e) => setEditForm({ ...editForm, mediaUrl: e.target.value })}
               />
+
               {editForm.mediaUrl && (
-                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <img
-                    src={editForm.mediaUrl}
-                    alt="Post Thumbnail"
-                    style={{ width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }}
-                  />
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    معاينة صورة المنشور المرفقة
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <img
+                      src={editForm.mediaUrl}
+                      alt="Post Thumbnail"
+                      style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }}
+                    />
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#10B981' }}>✓ تم إرفاق الصورة بنجاح</div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', maxWidth: '360px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {editForm.mediaUrl}
+                      </div>
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, mediaUrl: '' })}
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: '0.75rem', color: 'var(--color-danger)' }}
+                  >
+                    إزالة ✕
+                  </button>
                 </div>
               )}
             </div>
@@ -2528,9 +2628,29 @@ export default function MetaProDashboard() {
                   marginBottom: '24px',
                 }}
               >
-                <div style={{ fontSize: '0.88rem', fontWeight: '700', marginBottom: '10px', color: '#10B981' }}>
-                  📊 إحصائيات وتفاصيل النشر المباشر:
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: '700', color: '#10B981' }}>
+                      📊 إحصائيات وتفاصيل النشر المباشر:
+                    </span>
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                      🟢 متصل مباشرة بـ Meta Graph API
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isSyncingMetrics}
+                    onClick={() => handleSyncPostMetrics(selectedPost.id)}
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    title="تحديث الأرقام الفعلية من فيسبوك وإنستغرام الآن"
+                  >
+                    <RefreshCw size={13} className={isSyncingMetrics ? 'spin' : ''} />
+                    <span>{isSyncingMetrics ? 'جاري التحديث...' : '🔄 تحديث الإحصائيات الحية'}</span>
+                  </button>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', textAlign: 'center' }}>
                   <div style={{ background: 'var(--bg-surface-high)', padding: '10px', borderRadius: '8px' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الوصول</div>
@@ -2538,7 +2658,7 @@ export default function MetaProDashboard() {
                   </div>
                   <div style={{ background: 'var(--bg-surface-high)', padding: '10px', borderRadius: '8px' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الإعجابات</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '800' }}>{selectedPost.metrics?.likes || 0}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#10B981' }}>{selectedPost.metrics?.likes || 0}</div>
                   </div>
                   <div style={{ background: 'var(--bg-surface-high)', padding: '10px', borderRadius: '8px' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>التعليقات</div>
@@ -2549,6 +2669,12 @@ export default function MetaProDashboard() {
                     <div style={{ fontSize: '1.2rem', fontWeight: '800' }}>{selectedPost.metrics?.shares || 0}</div>
                   </div>
                 </div>
+
+                {(!selectedPost.metrics?.likes && !selectedPost.metrics?.comments) && (
+                  <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: '6px' }}>
+                    ℹ️ المنشور حديث النشر (0 تفاعلات حالياً). بمجرد تفاعل المتابعين على فيسبوك أو إنستغرام، اضغط "تحديث الإحصائيات الحية" لجلب الأرقام فوراً.
+                  </div>
+                )}
               </div>
             )}
 
