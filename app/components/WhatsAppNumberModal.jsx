@@ -18,18 +18,36 @@ import {
   Check,
   ArrowRight,
   Radio,
+  Lock,
+  Mail,
+  User,
+  Clock,
+  Sparkles,
+  Users,
+  Eye,
+  EyeOff,
+  UserPlus,
 } from 'lucide-react';
 
 export default function WhatsAppNumberModal({ isOpen, onClose, onUpdated }) {
   const [loading, setLoading] = useState(false);
   const [statusData, setStatusData] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'switch_number' | 'server_config'
+  const [activeTab, setActiveTab] = useState('login'); // 'login' | 'create_client' | 'overview' | 'server_config'
   
-  // Switch number form state
-  const [newPhone, setNewPhone] = useState('');
-  const [connectMethod, setConnectMethod] = useState('pairing_code'); // 'pairing_code' | 'qr_code'
-  const [actionResult, setActionResult] = useState(null);
-  const [copiedCode, setCopiedCode] = useState(false);
+  // Login form state
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginResult, setLoginResult] = useState(null);
+
+  // Create Client Account form state
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientPassword, setClientPassword] = useState('');
+  const [planDuration, setPlanDuration] = useState('1m'); // '24h' | '1m' | '3m' | '1y' | 'lifetime'
+  const [clientNotes, setClientNotes] = useState('');
+  const [createResult, setCreateResult] = useState(null);
 
   // Server config state
   const [customServerUrl, setCustomServerUrl] = useState('');
@@ -54,42 +72,79 @@ export default function WhatsAppNumberModal({ isOpen, onClose, onUpdated }) {
   useEffect(() => {
     if (isOpen) {
       fetchStatus();
-      setActionResult(null);
+      setLoginResult(null);
+      setCreateResult(null);
       setServerSaveNotice('');
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSwitchNumber = async (e) => {
+  // Handle Login & Connect
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setActionResult(null);
+    setLoginResult(null);
     try {
       const res = await fetch('/api/whatsapp-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'switch_number',
-          newPhone: newPhone.trim(),
-          method: connectMethod,
+          action: 'login',
+          emailOrPhone: loginIdentifier.trim(),
+          password: loginPassword,
         }),
       });
       const data = await res.json();
-      setActionResult(data);
+      setLoginResult(data);
       if (data.success) {
         fetchStatus();
         if (onUpdated) onUpdated();
       }
     } catch (err) {
-      setActionResult({ success: false, error: err.message });
+      setLoginResult({ success: false, error: err.message });
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle Create Client
+  const handleCreateClient = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setCreateResult(null);
+    try {
+      const res = await fetch('/api/whatsapp-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_client',
+          displayName: clientName.trim(),
+          phone: clientPhone.trim(),
+          email: clientEmail.trim(),
+          password: clientPassword,
+          planDuration,
+          notes: clientNotes.trim(),
+        }),
+      });
+      const data = await res.json();
+      setCreateResult(data);
+      if (data.success) {
+        fetchStatus();
+        // Prefill login identifier with the new client
+        setLoginIdentifier(clientPhone.trim() || clientEmail.trim());
+        setLoginPassword(clientPassword);
+      }
+    } catch (err) {
+      setCreateResult({ success: false, error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Disconnect / Logout
   const handleDisconnect = async () => {
-    if (!confirm('هل أنت متأكد من رغبتك في تسجيل الخروج وفصل رقم الواتساب الحالي؟ سيتمكن المشرفون من ربط رقم جديد فوراً.')) {
+    if (!confirm('هل أنت متأكد من تسجيل الخروج من حساب واتساب الحالي؟ ستتمكن من تسجيل الدخول بحساب آخر فوراً.')) {
       return;
     }
     setLoading(true);
@@ -100,20 +155,22 @@ export default function WhatsAppNumberModal({ isOpen, onClose, onUpdated }) {
         body: JSON.stringify({ action: 'disconnect' }),
       });
       const data = await res.json();
-      setActionResult(data);
-      fetchStatus();
-      if (onUpdated) onUpdated();
-    } catch (err) {
-      setActionResult({ success: false, error: err.message });
+      if (data.success) {
+        setLoginResult(null);
+        fetchStatus();
+        if (onUpdated) onUpdated();
+      }
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveServerConfig = async (e) => {
+  // Handle Save Server Settings
+  const handleSaveServer = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setServerSaveNotice('');
     try {
       const res = await fetch('/api/whatsapp-config', {
         method: 'POST',
@@ -125,465 +182,841 @@ export default function WhatsAppNumberModal({ isOpen, onClose, onUpdated }) {
       });
       const data = await res.json();
       if (data.success) {
-        setServerSaveNotice('تم حفظ إعدادات السيرفر واختبار الاتصال بنجاح! 🚀');
-        setStatusData(data.status);
-        if (onUpdated) onUpdated();
-      } else {
-        setServerSaveNotice(`خطأ: ${data.error}`);
+        setServerSaveNotice('تم حفظ وتحديث رابط سيرفر واتساب بنجاح!');
+        fetchStatus();
       }
-    } catch (err) {
-      setServerSaveNotice(`خطأ في الحفظ: ${err.message}`);
+    } catch (e) {
+      setServerSaveNotice('تعذر حفظ الإعدادات: ' + e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const copyPairingCode = (code) => {
-    if (!code) return;
-    navigator.clipboard.writeText(code);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2500);
-  };
+  const isConnected = statusData?.isConnected;
+  const activePhone = statusData?.formattedPhone || '+20 155 890 9252';
+  const accountName = statusData?.accountName || 'سوق الاشتراكات';
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-content modal-lg">
-        {/* Modal Header */}
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
-            }}>
-              <Phone size={22} />
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(5, 7, 15, 0.85)',
+        backdropFilter: 'blur(10px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '840px',
+          maxHeight: '92vh',
+          background: 'linear-gradient(135deg, rgba(16, 20, 36, 0.98), rgba(20, 26, 48, 0.98))',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '24px',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(37, 211, 102, 0.15)',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* HEADER */}
+        <div
+          style={{
+            padding: '22px 28px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            background: 'rgba(16, 20, 36, 0.95)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #25D366, #128C7E)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 20px rgba(37, 211, 102, 0.25)',
+              }}
+            >
+              <Phone size={24} color="#fff" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                إدارة رقم استقبال رسائل الواتساب (WhatsApp Hub)
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                ربط وتبديل حساب واتساب برو (WhatsApp Hub)
               </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                ربط وتعديل رقم الواتساب الذي يستقبل رسائل الإعلانات عبر سيرفر WhatsApp Pro المستضاف
+              <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '4px 0 0 0' }}>
+                تسجيل الدخول وربط حسابات العملاء عبر سيرفر WhatsApp Pro CRM لاستقبال رسائل الإعلانات
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: '8px' }}>
+
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#94A3B8',
+              transition: 'all 0.2s',
+            }}
+          >
             <X size={20} />
           </button>
         </div>
 
-        {/* Modal Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '0 24px 16px',
-          borderBottom: '1px solid var(--border-subtle)',
-        }}>
+        {/* TABS NAVIGATION */}
+        <div
+          style={{
+            display: 'flex',
+            padding: '12px 28px 0 28px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            gap: '8px',
+            overflowX: 'auto',
+          }}
+        >
+          <button
+            onClick={() => setActiveTab('login')}
+            style={{
+              padding: '10px 18px',
+              border: 'none',
+              borderRadius: '10px 10px 0 0',
+              background: activeTab === 'login' ? 'rgba(37, 211, 102, 0.15)' : 'transparent',
+              color: activeTab === 'login' ? '#25D366' : '#94A3B8',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              borderBottom: activeTab === 'login' ? '2px solid #25D366' : '2px solid transparent',
+            }}
+          >
+            <KeyRound size={16} />
+            <span>تسجيل الدخول وربط الحساب</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('create_client')}
+            style={{
+              padding: '10px 18px',
+              border: 'none',
+              borderRadius: '10px 10px 0 0',
+              background: activeTab === 'create_client' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              color: activeTab === 'create_client' ? '#38BDF8' : '#94A3B8',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              borderBottom: activeTab === 'create_client' ? '2px solid #38BDF8' : '2px solid transparent',
+            }}
+          >
+            <UserPlus size={16} />
+            <span>إضافة عميل واشتراك جديد</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('overview')}
-            className={`btn btn-sm ${activeTab === 'overview' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-full)' }}
+            style={{
+              padding: '10px 18px',
+              border: 'none',
+              borderRadius: '10px 10px 0 0',
+              background: activeTab === 'overview' ? 'rgba(168, 85, 247, 0.15)' : 'transparent',
+              color: activeTab === 'overview' ? '#C084FC' : '#94A3B8',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              borderBottom: activeTab === 'overview' ? '2px solid #C084FC' : '2px solid transparent',
+            }}
           >
-            <Radio size={16} /> الحالة الحالية والرقم النشط
+            <Phone size={16} />
+            <span>الحساب النشط والحالة</span>
+            {isConnected && (
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#25D366' }}></span>
+            )}
           </button>
-          <button
-            onClick={() => setActiveTab('switch_number')}
-            className={`btn btn-sm ${activeTab === 'switch_number' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-full)' }}
-          >
-            <KeyRound size={16} /> تعديل / ربط رقم جديد
-          </button>
+
           <button
             onClick={() => setActiveTab('server_config')}
-            className={`btn btn-sm ${activeTab === 'server_config' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-full)' }}
+            style={{
+              padding: '10px 18px',
+              border: 'none',
+              borderRadius: '10px 10px 0 0',
+              background: activeTab === 'server_config' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+              color: activeTab === 'server_config' ? '#fff' : '#94A3B8',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              borderBottom: activeTab === 'server_config' ? '2px solid #fff' : '2px solid transparent',
+            }}
           >
-            <Server size={16} /> إعدادات السيرفر المستضاف
+            <Server size={16} />
+            <span>إعدادات السيرفر</span>
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
-          {/* TAB 1: OVERVIEW */}
-          {activeTab === 'overview' && (
+        {/* BODY CONTENT */}
+        <div style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* TAB 1: LOGIN & CONNECT (PRIMARY) */}
+          {activeTab === 'login' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Active Number Hero Card */}
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(37, 211, 102, 0.08) 0%, rgba(16, 22, 31, 0.95) 100%)',
-                border: '1px solid rgba(37, 211, 102, 0.3)',
-                borderRadius: 'var(--radius-lg)',
-                padding: '24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '16px',
-              }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <span className="badge badge-whatsapp" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#25D366', display: 'inline-block' }}></span>
-                      {statusData?.isConnected ? 'متصل ونشط لاستقبال الرسائل' : 'في انتظار الاتصال'}
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      زمن الاستجابة: {statusData?.latencyMs || 0}ms
-                    </span>
-                  </div>
-                  <h3 style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '1px', color: '#fff', direction: 'ltr', textAlign: 'right' }}>
-                    {statusData?.formattedPhone || '+20 155 482 6209'}
-                  </h3>
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    اسم الحساب المرتبط: <strong>{statusData?.accountName || 'WhatsApp Pro CRM'}</strong>
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={() => setActiveTab('switch_number')}
-                    className="btn btn-primary"
-                    style={{ background: '#25D366', borderColor: '#25D366' }}
-                  >
-                    <KeyRound size={16} /> تعديل أو تغيير الرقم
-                  </button>
-                  <button
-                    onClick={fetchStatus}
-                    className="btn btn-secondary"
-                    disabled={loading}
-                  >
-                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> تحديث
-                  </button>
+              <div
+                style={{
+                  background: 'rgba(37, 211, 102, 0.08)',
+                  border: '1px solid rgba(37, 211, 102, 0.25)',
+                  borderRadius: '16px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                }}
+              >
+                <Sparkles size={20} color="#25D366" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.88rem', color: '#CBD5E1', lineHeight: '1.6' }}>
+                  <strong>الربط المباشر بالحساب:</strong> أدخل البريد الإلكتروني أو رقم الهاتف وكلمة المرور المسجلين في منصة <strong>WhatsApp Pro CRM</strong>. إذا كان الحساب قد مسح رمز QR مسبقاً، فسيتم الربط فورياً والتعرف على الرقم دون الحاجة لإعادة المسح.
                 </div>
               </div>
 
-              {/* CRM & Traffic Statistics */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '12px',
-              }}>
-                <div className="card" style={{ padding: '16px', background: 'var(--bg-surface-elevated)' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>عملاء الواتساب النشطين</span>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#25D366', marginTop: '4px' }}>
-                    {statusData?.stats?.totalContacts || 243} عميل
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>جاهزون للمراسلة والإعلانات</span>
-                </div>
-
-                <div className="card" style={{ padding: '16px', background: 'var(--bg-surface-elevated)' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>إجمالي سجل الرسائل</span>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--meta-blue)', marginTop: '4px' }}>
-                    {(statusData?.stats?.totalMessages || 21868).toLocaleString()} رسالة
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>محفوظة في Neon PostgreSQL</span>
-                </div>
-
-                <div className="card" style={{ padding: '16px', background: 'var(--bg-surface-elevated)' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>مستضيف الخدمة السحابي</span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '6px' }}>
-                    Railway Cloud
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>خدمة Baileys الدائمة</span>
-                </div>
-              </div>
-
-              {/* Direct Railway Host Link */}
-              <div style={{
-                padding: '16px',
-                borderRadius: 'var(--radius-md)',
-                background: 'rgba(8, 102, 255, 0.08)',
-                border: '1px solid rgba(8, 102, 255, 0.2)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
+              {/* Login Form */}
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    منصة WhatsApp Pro Automation المستضافة (Railway)
-                  </h4>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', direction: 'ltr', textAlign: 'right' }}>
-                    {statusData?.serverUrl || 'https://whatsapp-pro-crm-production-613b.up.railway.app'}
-                  </p>
-                </div>
-                <a
-                  href={statusData?.serverUrl || 'https://whatsapp-pro-crm-production-613b.up.railway.app'}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-secondary btn-sm"
-                  style={{ gap: '6px' }}
-                >
-                  <ExternalLink size={15} /> فتح لوحة السيرفر
-                </a>
-              </div>
-
-              {/* Danger Zone: Disconnect */}
-              <div style={{
-                marginTop: '10px',
-                paddingTop: '16px',
-                borderTop: '1px solid var(--border-subtle)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
-                <div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-danger)' }}>
-                    فصل الرقم الحالي (تسجيل الخروج)
-                  </span>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    استخدم هذا الخيار إذا أردت إيقاف استقبال الرسائل على هذا الرقم والربط برقم آخر فوراً.
-                  </p>
-                </div>
-                <button
-                  onClick={handleDisconnect}
-                  className="btn btn-danger btn-sm"
-                  disabled={loading}
-                >
-                  <LogOut size={16} /> تسجيل خروج وفصل
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: SWITCH PHONE NUMBER */}
-          {activeTab === 'switch_number' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{
-                padding: '16px',
-                borderRadius: 'var(--radius-md)',
-                background: 'rgba(245, 158, 11, 0.1)',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'flex-start',
-              }}>
-                <AlertTriangle size={22} style={{ color: 'var(--color-warning)', flexShrink: 0, marginTop: '2px' }} />
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                  <strong style={{ color: 'var(--color-warning)' }}>تعديل رقم استقبال رسائل الواتساب:</strong>
-                  <br />
-                  يمكنك استبدال الرقم الحالي برقم تسويق جديد بكل سهولة دون فقدان أي عملاء أو رسائل سابقة.
-                  اختر طريقة الربط المناسبة: <strong>كود الربط المباشر (Pairing Code)</strong> أو <strong>مسح رمز الـ QR</strong>.
-                </div>
-              </div>
-
-              <form onSubmit={handleSwitchNumber} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 700 }}>طريقة ربط وتفعيل الرقم الجديد:</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '6px' }}>
-                    <div
-                      onClick={() => setConnectMethod('pairing_code')}
-                      style={{
-                        padding: '14px',
-                        borderRadius: 'var(--radius-md)',
-                        border: connectMethod === 'pairing_code' ? '2px solid #25D366' : '1px solid var(--border-card)',
-                        background: connectMethod === 'pairing_code' ? 'rgba(37, 211, 102, 0.1)' : 'var(--bg-surface-elevated)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                      }}
-                    >
-                      <KeyRound size={20} style={{ color: '#25D366' }} />
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>كود الربط الرقمي (موصى به)</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>أدخل الرقم واستلم كود من 8 خانات</div>
-                      </div>
-                    </div>
-
-                    <div
-                      onClick={() => setConnectMethod('qr_code')}
-                      style={{
-                        padding: '14px',
-                        borderRadius: 'var(--radius-md)',
-                        border: connectMethod === 'qr_code' ? '2px solid #25D366' : '1px solid var(--border-card)',
-                        background: connectMethod === 'qr_code' ? 'rgba(37, 211, 102, 0.1)' : 'var(--bg-surface-elevated)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                      }}
-                    >
-                      <QrCode size={20} style={{ color: '#25D366' }} />
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>مسح رمز QR Code</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المسح عبر كاميرا واتساب</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontWeight: 700 }}>
-                    رقم هاتف الواتساب الجديد المراد استقبال الرسائل عليه:
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '8px' }}>
+                    البريد الإلكتروني أو رقم الهاتف المسجل:
                   </label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type="text"
-                      className="input"
-                      placeholder="مثال: 201012345678 (مع كود الدولة وبدون + أو أصفار إضافية)"
-                      value={newPhone}
-                      onChange={(e) => setNewPhone(e.target.value)}
-                      style={{ direction: 'ltr', textAlign: 'left', paddingLeft: '40px', fontSize: '1rem', fontWeight: 600 }}
+                      required
+                      placeholder="مثال: 001558909252 أو user@whatsapp.pro"
+                      value={loginIdentifier}
+                      onChange={(e) => setLoginIdentifier(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 42px 12px 16px',
+                        background: 'rgba(0, 0, 0, 0.35)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '12px',
+                        color: '#fff',
+                        fontSize: '0.92rem',
+                        outline: 'none',
+                        direction: 'ltr',
+                        textAlign: 'left',
+                      }}
                     />
-                    <Phone size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
+                    <Mail
+                      size={18}
+                      color="#94A3B8"
+                      style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)' }}
+                    />
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                    الرقم الحالي المسجل: <strong>{statusData?.formattedPhone || '+20 155 482 6209'}</strong>
-                  </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    style={{ background: '#25D366', borderColor: '#25D366', flex: 1 }}
-                    disabled={loading || (connectMethod === 'pairing_code' && !newPhone.trim())}
-                  >
-                    {loading ? (
-                      <RefreshCw size={18} className="animate-spin" />
-                    ) : (
-                      <>
-                        <ShieldCheck size={18} /> تفعيل وربط الرقم الجديد الآن
-                      </>
-                    )}
-                  </button>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '8px' }}>
+                    كلمة المرور (Password):
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder="أدخل كلمة مرور الحساب"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 42px 12px 42px',
+                        background: 'rgba(0, 0, 0, 0.35)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '12px',
+                        color: '#fff',
+                        fontSize: '0.92rem',
+                        outline: 'none',
+                        direction: 'ltr',
+                      }}
+                    />
+                    <Lock
+                      size={18}
+                      color="#94A3B8"
+                      style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#94A3B8',
+                      }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Quick Select from existing platform accounts */}
+                {statusData?.savedUsers?.length > 0 && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#94A3B8', marginBottom: '6px' }}>
+                      أو اختر حساباً مسجلاً في النظام بنقرة واحدة:
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {statusData.savedUsers.map((u) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setLoginIdentifier(u.phone || u.email);
+                            setLoginResult(null);
+                          }}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            color: '#CBD5E1',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <User size={13} color="#25D366" />
+                          <span>{u.displayName || u.phone || u.email}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #25D366, #128C7E)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    boxShadow: '0 8px 25px rgba(37, 211, 102, 0.3)',
+                    marginTop: '8px',
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      <span>جاري التحقق وتسجيل الدخول...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound size={18} />
+                      <span>تسجيل الدخول وربط حساب الواتساب الآن</span>
+                    </>
+                  )}
+                </button>
               </form>
 
-              {/* Action Result / Pairing Code Instructions */}
-              {actionResult && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '18px',
-                  borderRadius: 'var(--radius-lg)',
-                  background: actionResult.success ? 'rgba(37, 211, 102, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                  border: `1px solid ${actionResult.success ? '#25D366' : 'var(--color-danger)'}`,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    {actionResult.success ? (
-                      <CheckCircle2 size={20} style={{ color: '#25D366' }} />
-                    ) : (
-                      <XCircle size={20} style={{ color: 'var(--color-danger)' }} />
-                    )}
-                    <h4 style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>
-                      {actionResult.success ? 'تم تجهيز طلب ربط الرقم بنجاح!' : 'حدث خطأ في عملية الربط'}
-                    </h4>
-                  </div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    {actionResult.message || actionResult.error}
-                  </p>
-
-                  {/* Pairing Code Card */}
-                  {actionResult.pairingCode && (
-                    <div style={{
-                      background: 'var(--bg-app)',
-                      padding: '16px',
-                      borderRadius: 'var(--radius-md)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      border: '1px dashed #25D366',
-                    }}>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>كود الربط الخاص بهاتفك (Pairing Code):</span>
-                        <div style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '4px', color: '#25D366', direction: 'ltr' }}>
-                          {actionResult.pairingCode}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => copyPairingCode(actionResult.pairingCode)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ gap: '6px' }}
-                      >
-                        {copiedCode ? <Check size={16} /> : <Copy size={16} />}
-                        {copiedCode ? 'تم النسخ!' : 'نسخ الكود'}
-                      </button>
-                    </div>
+              {/* Login Result Feedback */}
+              {loginResult && (
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    borderRadius: '14px',
+                    background: loginResult.success ? 'rgba(37, 211, 102, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                    border: loginResult.success ? '1px solid #25D366' : '1px solid #EF4444',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                  }}
+                >
+                  {loginResult.success ? (
+                    <CheckCircle2 size={22} color="#25D366" style={{ flexShrink: 0 }} />
+                  ) : (
+                    <AlertTriangle size={22} color="#EF4444" style={{ flexShrink: 0 }} />
                   )}
-
-                  {/* Step-by-Step Instructions */}
-                  <div style={{ marginTop: '14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                    <strong>خطوات إتمام الربط على تطبيق واتساب في هاتفك:</strong>
-                    <ol style={{ paddingRight: '20px', marginTop: '6px', lineHeight: '1.7' }}>
-                      <li>افتح تطبيق واتساب على الهاتف الذي يحمل الرقم <strong>{newPhone || 'الجديد'}</strong>.</li>
-                      <li>اضغط على <strong>الثلاث نقاط</strong> (أو الإعدادات) واختر <strong>الأجهزة المرتبطة (Linked Devices)</strong>.</li>
-                      <li>اضغط على <strong>ربط جهاز (Link a device)</strong>.</li>
-                      <li>اضغط بالأسفل على <strong>الربط برقم الهاتف بدلاً من ذلك (Link with phone number instead)</strong>.</li>
-                      <li>أدخل الكود الموضح بالأعلى، وسيتم التفعيل وبدء استقبال رسائل الإعلانات فوراً! 🎉</li>
-                    </ol>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>
+                      {loginResult.success ? 'تم ربط الحساب بنجاح!' : 'خطأ في تسجيل الدخول'}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#CBD5E1', marginTop: '4px', lineHeight: '1.5' }}>
+                      {loginResult.message || loginResult.error}
+                    </div>
+                    {loginResult.qr && !loginResult.isAlreadyLinked && (
+                      <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '8px' }}>
+                          الحساب مسجل لكنه يحتاج لمسح رمز QR لأول مرة:
+                        </div>
+                        <img
+                          src={loginResult.qr}
+                          alt="QR Code"
+                          style={{ width: '180px', height: '180px', borderRadius: '12px', background: '#fff', padding: '8px' }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* TAB 3: SERVER CONFIG */}
-          {activeTab === 'server_config' && (
+          {/* TAB 2: CREATE CLIENT & SUBSCRIPTION PLAN (AS EXPLAINED BY USER) */}
+          {activeTab === 'create_client' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{
-                padding: '16px',
-                borderRadius: 'var(--radius-md)',
-                background: 'var(--bg-surface-elevated)',
-                border: '1px solid var(--border-card)',
-              }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                  ربط سيرفر WhatsApp Pro المستضاف (Railway / VPS)
-                </h4>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                  تتواصل هذه المنصة مع سيرفر واتساب برو المخصص الخاص بك لإرسال واستقبال الرسائل وأتمتة الردود. يمكنك تغيير رابط السيرفر إذا قمت باستضافته على نطاق مخصص.
-                </p>
+              <div
+                style={{
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  borderRadius: '16px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                }}
+              >
+                <UserPlus size={20} color="#38BDF8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.88rem', color: '#CBD5E1', lineHeight: '1.6' }}>
+                  <strong>إنشاء عميل جديد وتحديد خطة الاشتراك:</strong> كأدمن للنظام يمكنك إضافة عميل جديد، تحديد اسمه ورقمه وكلمة مروره، واختيار فترة الاشتراك (تجريبي 24 ساعة، شهر، 3 شهور، أو مدى الحياة).
+                </div>
               </div>
 
-              <form onSubmit={handleSaveServerConfig} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label className="form-label">رابط السيرفر المستضاف (WhatsApp Server URL):</label>
-                  <input
-                    type="url"
-                    className="input"
-                    placeholder="https://whatsapp-pro-crm-production-613b.up.railway.app"
-                    value={customServerUrl}
-                    onChange={(e) => setCustomServerUrl(e.target.value)}
-                    style={{ direction: 'ltr', textAlign: 'left' }}
-                  />
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                    السيرفر الافتراضي: <code>https://whatsapp-pro-crm-production-613b.up.railway.app</code>
-                  </span>
+              <form onSubmit={handleCreateClient} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '6px' }}>
+                      اسم العميل أو المتجر:
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="مثال: متجر النخبة / محمد أحمد"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(0, 0, 0, 0.35)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '0.88rem',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '6px' }}>
+                      رقم هاتف العميل (مع كود الدولة):
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="مثال: 201012345678"
+                      value={clientPhone}
+                      onChange={(e) => setClientPhone(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(0, 0, 0, 0.35)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '0.88rem',
+                        outline: 'none',
+                        direction: 'ltr',
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button type="submit" className="btn btn-primary" disabled={loading}>
-                    <Server size={16} /> حفظ واختبار الاتصال بالسيرفر
-                  </button>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '6px' }}>
+                      البريد الإلكتروني (اختياري):
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="client@whatsapp.pro"
+                      value={clientEmail}
+                      onChange={(e) => setClientEmail(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(0, 0, 0, 0.35)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '0.88rem',
+                        outline: 'none',
+                        direction: 'ltr',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '6px' }}>
+                      كلمة مرور الحساب:
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="6 أحرف على الأقل"
+                      value={clientPassword}
+                      onChange={(e) => setClientPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(0, 0, 0, 0.35)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '0.88rem',
+                        outline: 'none',
+                        direction: 'ltr',
+                      }}
+                    />
+                  </div>
                 </div>
+
+                {/* Subscription Plan Radio Selection */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '8px' }}>
+                    باقة وفترة الاشتراك الممنوحة:
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                    {[
+                      { id: '24h', label: 'تجريبي (24 ساعة)', icon: '⚡' },
+                      { id: '1m', label: 'شهر كامل (30 يوم)', icon: '📅' },
+                      { id: '3m', label: '3 شهور (90 يوم)', icon: '🚀' },
+                      { id: '1y', label: 'سنة كاملة (365 يوم)', icon: '💎' },
+                      { id: 'lifetime', label: 'مدى الحياة (Lifetime)', icon: '♾️' },
+                    ].map((plan) => (
+                      <div
+                        key={plan.id}
+                        onClick={() => setPlanDuration(plan.id)}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '10px',
+                          background: planDuration === plan.id ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                          border: planDuration === plan.id ? '1px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.08)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ fontSize: '1.2rem', marginBottom: '4px' }}>{plan.icon}</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: planDuration === plan.id ? '#38BDF8' : '#CBD5E1' }}>
+                          {plan.label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #38BDF8, #0284C7)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    fontSize: '0.92rem',
+                    fontWeight: 800,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    boxShadow: '0 8px 25px rgba(56, 189, 248, 0.25)',
+                    marginTop: '6px',
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      <span>جاري إنشاء الحساب...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus size={18} />
+                      <span>إنشاء حساب العميل وتفعيله الآن</span>
+                    </>
+                  )}
+                </button>
               </form>
 
+              {createResult && (
+                <div
+                  style={{
+                    padding: '14px 18px',
+                    borderRadius: '12px',
+                    background: createResult.success ? 'rgba(56, 189, 248, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                    border: createResult.success ? '1px solid #38BDF8' : '1px solid #EF4444',
+                    fontSize: '0.85rem',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  {createResult.success ? <CheckCircle2 size={18} color="#38BDF8" /> : <AlertTriangle size={18} color="#EF4444" />}
+                  <span>{createResult.message || createResult.error}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: ACTIVE ACCOUNT OVERVIEW */}
+          {activeTab === 'overview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '18px',
+                  padding: '22px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: isConnected ? '#25D366' : '#EF4444',
+                        boxShadow: isConnected ? '0 0 12px #25D366' : '0 0 12px #EF4444',
+                      }}
+                    />
+                    <div>
+                      <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>الحساب المتصل الحالي:</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>{accountName}</div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: 'rgba(37, 211, 102, 0.15)',
+                      border: '1px solid rgba(37, 211, 102, 0.35)',
+                      borderRadius: '10px',
+                      padding: '6px 14px',
+                      color: '#25D366',
+                      fontWeight: 800,
+                      fontSize: '0.92rem',
+                      direction: 'ltr',
+                    }}
+                  >
+                    {activePhone}
+                  </div>
+                </div>
+
+                {/* Stats Bar */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '6px' }}>
+                  <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>حالة الربط</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: isConnected ? '#25D366' : '#EF4444', marginTop: '4px' }}>
+                      {isConnected ? 'متصل وجاهز ✅' : 'غير متصل ❌'}
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>جهات الاتصال النشطة</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#38BDF8', marginTop: '4px' }}>
+                      {statusData?.stats?.totalContacts || 0} جهة
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>إجمالي الرسائل</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#A855F7', marginTop: '4px' }}>
+                      {statusData?.stats?.totalMessages?.toLocaleString() || 0} رسالة
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button
+                    onClick={handleDisconnect}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#F87171',
+                      borderRadius: '10px',
+                      padding: '10px 18px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <LogOut size={16} />
+                    <span>تسجيل الخروج وتبديل الحساب</span>
+                  </button>
+
+                  <a
+                    href={`${customServerUrl || 'https://whatsapp-pro-crm-production-613b.up.railway.app'}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#CBD5E1',
+                      borderRadius: '10px',
+                      padding: '10px 18px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <ExternalLink size={16} />
+                    <span>فتح موقع واتساب برو المستضاف</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: SERVER CONFIG */}
+          {activeTab === 'server_config' && (
+            <form onSubmit={handleSaveServer} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '8px' }}>
+                  رابط سيرفر WhatsApp Pro CRM المستضاف (Railway / Cloud Container):
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={customServerUrl}
+                  onChange={(e) => setCustomServerUrl(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '12px',
+                    color: '#38BDF8',
+                    fontSize: '0.9rem',
+                    fontFamily: 'monospace',
+                    direction: 'ltr',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #1877F2, #0084FF)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 20px',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  حفظ وتحديث السيرفر
+                </button>
+              </div>
+
               {serverSaveNotice && (
-                <div style={{
-                  padding: '12px 16px',
-                  borderRadius: 'var(--radius-md)',
-                  background: serverSaveNotice.includes('خطأ') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                  border: `1px solid ${serverSaveNotice.includes('خطأ') ? 'var(--color-danger)' : 'var(--color-success)'}`,
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  color: serverSaveNotice.includes('خطأ') ? 'var(--color-danger)' : 'var(--color-success)',
-                }}>
+                <div style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '6px' }}>
                   {serverSaveNotice}
                 </div>
               )}
-            </div>
+            </form>
           )}
+
         </div>
 
-        {/* Modal Footer */}
-        <div className="modal-footer" style={{ borderTop: '1px solid var(--border-subtle)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            🟢 قاعدة بيانات موحدة: <strong>Neon Cloud PostgreSQL</strong>
+        {/* FOOTER */}
+        <div
+          style={{
+            padding: '16px 28px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'rgba(16, 20, 36, 0.95)',
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#94A3B8' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#25D366' }}></span>
+            <span>سيرفر الواتساب وقاعدة البيانات السحابية (Neon PostgreSQL) متصلان ونشطان</span>
           </div>
-          <button onClick={onClose} className="btn btn-secondary">
+
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '8px 20px',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+            }}
+          >
             إغلاق
           </button>
         </div>
