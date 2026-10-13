@@ -30,6 +30,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import MetaConnectGuideModal from './MetaConnectGuideModal';
 
 export default function OmnichannelInbox({ onOpenWhatsAppModal, whatsAppInfo }) {
   // State
@@ -42,6 +43,7 @@ export default function OmnichannelInbox({ onOpenWhatsAppModal, whatsAppInfo }) 
   const [sendingReply, setSendingReply] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [summaryStats, setSummaryStats] = useState({ total: 0, unread: 0, whatsappCount: 0, facebookCount: 0, instagramCount: 0 });
+  const [isMetaGuideOpen, setIsMetaGuideOpen] = useState(false);
 
   // Filters
   const [channelFilter, setChannelFilter] = useState('all'); // 'all' | 'whatsapp' | 'facebook' | 'instagram'
@@ -403,6 +405,29 @@ export default function OmnichannelInbox({ onOpenWhatsAppModal, whatsAppInfo }) 
               تعديل الرقم ⚙️
             </span>
           </div>
+
+          {/* Meta & Instagram Connect Guide Button */}
+          <button
+            onClick={() => setIsMetaGuideOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-full)',
+              background: 'linear-gradient(135deg, rgba(24, 119, 242, 0.15), rgba(225, 48, 108, 0.15))',
+              border: '1px solid rgba(225, 48, 108, 0.4)',
+              cursor: 'pointer',
+              color: '#fff',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              transition: 'var(--transition-fast)',
+            }}
+            title="دليل تفعيل رسائل إنستغرام وفيسبوك وحل مشكلة Vercel"
+          >
+            <HelpCircle size={15} style={{ color: '#E1306C' }} />
+            <span>دليل ربط إنستغرام وميتا ⚙️</span>
+          </button>
 
           <button
             onClick={() => fetchConversations(false)}
@@ -955,6 +980,12 @@ export default function OmnichannelInbox({ onOpenWhatsAppModal, whatsAppInfo }) 
           )}
         </div>
       </div>
+
+      {/* Meta & Instagram Connect Guide Modal */}
+      <MetaConnectGuideModal
+        isOpen={isMetaGuideOpen}
+        onClose={() => setIsMetaGuideOpen(false)}
+      />
     </div>
   );
 }
