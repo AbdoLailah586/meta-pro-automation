@@ -38,15 +38,23 @@ import {
   Rocket,
   Flame,
   Upload,
+  Phone,
 } from 'lucide-react';
 import CompetitorSpyRadar from './components/CompetitorSpyRadar';
 import ViralReelsStudio from './components/ViralReelsStudio';
 import GrowthHub from './components/GrowthHub';
+import OmnichannelInbox from './components/OmnichannelInbox';
+import WhatsAppNumberModal from './components/WhatsAppNumberModal';
 
 export default function MetaProDashboard() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('inbox');
   const [isLoading, setIsLoading] = useState(true);
+
+  // WhatsApp Hub & Omnichannel State
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [whatsAppInfo, setWhatsAppInfo] = useState(null);
+  const [inboxUnreadCount, setInboxUnreadCount] = useState(0);
 
   // App Data State
   const [posts, setPosts] = useState([]);
@@ -201,8 +209,30 @@ export default function MetaProDashboard() {
     }
   };
 
+  const fetchWhatsAppStatus = async () => {
+    try {
+      const res = await fetch('/api/whatsapp-config');
+      const data = await res.json();
+      if (data.success) {
+        setWhatsAppInfo(data);
+      }
+    } catch (e) {}
+  };
+
+  const fetchInboxUnread = async () => {
+    try {
+      const res = await fetch('/api/inbox/conversations');
+      const data = await res.json();
+      if (data.success && data.stats) {
+        setInboxUnreadCount(data.stats.unread || 0);
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     fetchData();
+    fetchWhatsAppStatus();
+    fetchInboxUnread();
   }, []);
 
   // Handle Post Creation
@@ -555,6 +585,47 @@ export default function MetaProDashboard() {
           {/* Nav Links */}
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <button
+              onClick={() => setActiveTab('inbox')}
+              className={`nav-item ${activeTab === 'inbox' ? 'active' : ''}`}
+              style={{ width: '100%', border: 'none', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <MessageSquare size={19} color="#25D366" />
+                <span>رسائل الإعلانات الموحدة</span>
+              </div>
+              {inboxUnreadCount > 0 ? (
+                <span style={{
+                  background: '#25D366',
+                  color: '#000',
+                  fontSize: '0.72rem',
+                  fontWeight: '800',
+                  padding: '1px 7px',
+                  borderRadius: 'var(--radius-full)',
+                }}>
+                  {inboxUnreadCount}
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.68rem', color: '#25D366', padding: '1px 6px', background: 'rgba(37,211,102,0.1)', borderRadius: '4px' }}>
+                  نشط 🟢
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setIsWhatsAppModalOpen(true)}
+              className="nav-item"
+              style={{ width: '100%', border: 'none', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Phone size={19} color="#25D366" />
+                <span>إدارة رقم الواتساب</span>
+              </div>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', direction: 'ltr' }}>
+                {whatsAppInfo?.activePhone ? `...${whatsAppInfo.activePhone.slice(-4)}` : 'تعديل ⚙️'}
+              </span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('dashboard')}
               className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
               style={{ width: '100%', border: 'none', textAlign: 'right' }}
@@ -675,6 +746,7 @@ export default function MetaProDashboard() {
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
             <h1 style={{ fontSize: '1.75rem', fontWeight: '800', letterSpacing: '-0.5px' }}>
+              {activeTab === 'inbox' && 'مركز رسائل ومحادثات الإعلانات الموحد (Omnichannel Inbox)'}
               {activeTab === 'dashboard' && 'لوحة التحكم والنتائج'}
               {activeTab === 'composer' && 'استوديو صياغة المنشورات والذكاء الاصطناعي'}
               {activeTab === 'calendar' && 'تقويم وجدولة المنشورات'}
@@ -687,7 +759,9 @@ export default function MetaProDashboard() {
               {activeTab === 'ai-settings' && 'إعدادات نماذج الذكاء الاصطناعي (OpenRouter)'}
             </h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
-              إدارة حملات فيسبوك وإنستغرام بأعلى كفاءة مع أتمتة النشر والتحليلات
+              {activeTab === 'inbox'
+                ? 'استقبال وإدارة جميع استفسارات الحملات الإعلانية من واتساب وفيسبوك وإنستغرام والرد الفوري'
+                : 'إدارة حملات فيسبوك وإنستغرام بأعلى كفاءة مع أتمتة النشر والتحليلات'}
             </p>
           </div>
 
@@ -727,20 +801,25 @@ export default function MetaProDashboard() {
             </div>
 
             <div
+              onClick={() => setIsWhatsAppModalOpen(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 padding: '6px 14px',
                 background: 'rgba(37, 211, 102, 0.1)',
-                border: '1px solid rgba(37, 211, 102, 0.25)',
+                border: '1px solid rgba(37, 211, 102, 0.35)',
                 borderRadius: 'var(--radius-full)',
                 fontSize: '0.82rem',
                 color: '#25D366',
+                cursor: 'pointer',
+                transition: 'var(--transition-fast)',
               }}
+              title="انقر لإدارة وتعديل رقم الواتساب المستقبل للرسائل"
             >
-              <MessageSquare size={16} />
-              <span>WhatsApp Pro CRM</span>
+              <Phone size={15} />
+              <span>واتساب: <strong style={{ color: '#fff', direction: 'ltr', display: 'inline-block' }}>{whatsAppInfo?.formattedPhone || '+20 155 482 6209'}</strong></span>
+              <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(37, 211, 102, 0.2)', borderRadius: '4px' }}>تعديل ⚙️</span>
             </div>
 
             <button
@@ -2095,6 +2174,14 @@ export default function MetaProDashboard() {
             }}
           />
         )}
+
+        {/* ================= TAB: OMNICHANNEL INBOX ================= */}
+        {activeTab === 'inbox' && (
+          <OmnichannelInbox
+            onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+            whatsAppInfo={whatsAppInfo}
+          />
+        )}
       </main>
 
       {/* ================= AI GENERATOR MODAL ================= */}
@@ -2727,6 +2814,17 @@ export default function MetaProDashboard() {
           </div>
         </div>
       )}
+
+      {/* ================= WHATSAPP NUMBER SWITCHER MODAL ================= */}
+      <WhatsAppNumberModal
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        onUpdated={() => {
+          fetchWhatsAppStatus();
+          fetchInboxUnread();
+          showToast('تم تحديث إعدادات ورقم الواتساب بنجاح!');
+        }}
+      />
 
       {/* ================= TOAST NOTIFICATION ================= */}
       {toast && (
