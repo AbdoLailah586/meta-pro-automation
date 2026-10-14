@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section style={{ marginTop: '24px' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight 700 }}>2. الاستخدام المسموح به</h2>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>2. الاستخدام المسموح به</h2>
         <p>تُستخدم المنصة لأغراض التسويق القانوني وإدارة خدمة العملاء عبر منصات فيسبوك، إنستغرام، وواتساب بما يتوافق مع القوانين السارية وسياسات مكافحة البريد العشوائي (Anti-Spam).</p>
       </section>
     </div>
