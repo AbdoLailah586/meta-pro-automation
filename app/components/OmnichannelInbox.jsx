@@ -44,6 +44,25 @@ export default function OmnichannelInbox({ onOpenWhatsAppModal, whatsAppInfo }) 
   const [generatingAi, setGeneratingAi] = useState(false);
   const [summaryStats, setSummaryStats] = useState({ total: 0, unread: 0, whatsappCount: 0, facebookCount: 0, instagramCount: 0 });
   const [isMetaGuideOpen, setIsMetaGuideOpen] = useState(false);
+  const [hubStatus, setHubStatus] = useState(whatsAppInfo || null);
+
+  const fetchHubStatus = async () => {
+    try {
+      const res = await fetch('/api/whatsapp-config');
+      const data = await res.json();
+      if (data.success) {
+        setHubStatus(data);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchHubStatus();
+  }, []);
+
+  useEffect(() => {
+    if (whatsAppInfo) setHubStatus(whatsAppInfo);
+  }, [whatsAppInfo]);
 
   // Filters
   const [channelFilter, setChannelFilter] = useState('all'); // 'all' | 'whatsapp' | 'facebook' | 'instagram'
@@ -399,10 +418,11 @@ export default function OmnichannelInbox({ onOpenWhatsAppModal, whatsAppInfo }) 
           >
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#25D366' }}></span>
             <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>
-              واتساب الاستقبال: <strong style={{ color: '#25D366', direction: 'ltr', display: 'inline-block' }}>{whatsAppInfo?.formattedPhone || '+20 155 482 6209'}</strong>
+              واتساب الاستقبال: <strong style={{ color: '#25D366', direction: 'ltr', display: 'inline-block' }}>{hubStatus?.formattedPhone || whatsAppInfo?.formattedPhone || '+20 155 890 9252'}</strong>
+              <span style={{ color: '#CBD5E1', marginRight: '6px', fontSize: '0.76rem', opacity: 0.85 }}>({hubStatus?.accountName || whatsAppInfo?.accountName || 'سوق الاشتراكات'})</span>
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '2px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px' }}>
-              تعديل الرقم ⚙️
+            <span style={{ fontSize: '0.72rem', color: '#25D366', padding: '2px 8px', background: 'rgba(37, 211, 102, 0.15)', borderRadius: '4px', fontWeight: 700 }}>
+              تبديل ⚙️
             </span>
           </div>
 

@@ -818,8 +818,8 @@ export default function MetaProDashboard() {
               title="انقر لإدارة وتعديل رقم الواتساب المستقبل للرسائل"
             >
               <Phone size={15} />
-              <span>واتساب: <strong style={{ color: '#fff', direction: 'ltr', display: 'inline-block' }}>{whatsAppInfo?.formattedPhone || '+20 155 482 6209'}</strong></span>
-              <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(37, 211, 102, 0.2)', borderRadius: '4px' }}>تعديل ⚙️</span>
+              <span>واتساب: <strong style={{ color: '#fff', direction: 'ltr', display: 'inline-block' }}>{whatsAppInfo?.formattedPhone || '+20 155 890 9252'}</strong> <span style={{ opacity: 0.8, fontSize: '0.72rem', marginRight: '4px' }}>({whatsAppInfo?.accountName || 'سوق الاشتراكات'})</span></span>
+              <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(37, 211, 102, 0.2)', borderRadius: '4px' }}>تبديل ⚙️</span>
             </div>
 
             <button
