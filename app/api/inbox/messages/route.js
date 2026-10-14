@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchOmnichannelMessages, saveOmnichannelMessage } from '@/lib/neonMetaSchema';
-import { getWhatsAppServerUrl } from '@/lib/whatsappHubService';
+import { getWhatsAppServerUrl, getActiveWhatsAppAccount } from '@/lib/whatsappHubService';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,12 +47,17 @@ export async function POST(req) {
     if (channel === 'whatsapp' && conversationId.startsWith('wa_')) {
       const jid = conversationId.replace(/^wa_/, '');
       const serverUrl = await getWhatsAppServerUrl();
+      const activeAccount = await getActiveWhatsAppAccount();
+      const token = activeAccount?.token;
 
       // Try sending via WhatsApp Pro Server API
       try {
         const sendRes = await fetch(`${serverUrl}/api/contacts/${encodeURIComponent(jid)}/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ message: text.trim() }),
         });
         if (sendRes.ok) {
